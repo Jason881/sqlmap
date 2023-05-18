@@ -207,7 +207,7 @@ def _loadQueries():
         tree.parse(paths.QUERIES_XML)
     except Exception as ex:
         errMsg = "something appears to be wrong with "
-        errMsg += "the file '%s' ('%s'). Please make " % (paths.QUERIES_XML, getSafeExString(ex))
+        errMsg += f"the file '{paths.QUERIES_XML}' ('{getSafeExString(ex)}'). Please make "
         errMsg += "sure that you haven't made any changes to it"
         raise SqlmapInstallationException(errMsg)
 
@@ -226,7 +226,7 @@ def _setMultipleTargets():
     if not conf.logFile:
         return
 
-    debugMsg = "parsing targets list from '%s'" % conf.logFile
+    debugMsg = f"parsing targets list from '{conf.logFile}'"
     logger.debug(debugMsg)
 
     if not os.path.exists(conf.logFile):
@@ -236,7 +236,12 @@ def _setMultipleTargets():
     if checkFile(conf.logFile, False):
         for target in parseRequestFile(conf.logFile):
             url, _, data, _, _ = target
-            key = re.sub(r"(\w+=)[^%s ]*" % (conf.paramDel or DEFAULT_GET_POST_DELIMITER), r"\g<1>", "%s %s" % (url, data))
+            key = re.sub(
+                r"(\w+=)[^%s ]*"
+                % (conf.paramDel or DEFAULT_GET_POST_DELIMITER),
+                r"\g<1>",
+                f"{url} {data}",
+            )
             if key not in seen:
                 kb.targets.add(target)
                 seen.add(key)
@@ -251,14 +256,18 @@ def _setMultipleTargets():
 
             for target in parseRequestFile(os.path.join(conf.logFile, reqFile)):
                 url, _, data, _, _ = target
-                key = re.sub(r"(\w+=)[^%s ]*" % (conf.paramDel or DEFAULT_GET_POST_DELIMITER), r"\g<1>", "%s %s" % (url, data))
+                key = re.sub(
+                    r"(\w+=)[^%s ]*"
+                    % (conf.paramDel or DEFAULT_GET_POST_DELIMITER),
+                    r"\g<1>",
+                    f"{url} {data}",
+                )
                 if key not in seen:
                     kb.targets.add(target)
                     seen.add(key)
 
     else:
-        errMsg = "the specified list of targets is not a file "
-        errMsg += "nor a directory"
+        errMsg = "the specified list of targets is not a file " + "nor a directory"
         raise SqlmapFilePathException(errMsg)
 
     updatedTargetsCount = len(kb.targets)
@@ -302,11 +311,11 @@ def _setRequestFromFile():
             seen = set()
 
             if not checkFile(requestFile, False):
-                errMsg = "specified HTTP request file '%s' " % requestFile
+                errMsg = f"specified HTTP request file '{requestFile}' "
                 errMsg += "does not exist"
                 raise SqlmapFilePathException(errMsg)
 
-            infoMsg = "parsing HTTP request from '%s'" % requestFile
+            infoMsg = f"parsing HTTP request from '{requestFile}'"
             logger.info(infoMsg)
 
             for target in parseRequestFile(requestFile):
@@ -318,7 +327,7 @@ def _setRequestFromFile():
                     seen.add(url)
 
             if url is None:
-                errMsg = "specified file '%s' " % requestFile
+                errMsg = f"specified file '{requestFile}' "
                 errMsg += "does not contain a usable HTTP request (with parameters)"
                 raise SqlmapDataException(errMsg)
 
@@ -326,18 +335,18 @@ def _setRequestFromFile():
         conf.secondReq = safeExpandUser(conf.secondReq)
 
         if not checkFile(conf.secondReq, False):
-            errMsg = "specified second-order HTTP request file '%s' " % conf.secondReq
+            errMsg = f"specified second-order HTTP request file '{conf.secondReq}' "
             errMsg += "does not exist"
             raise SqlmapFilePathException(errMsg)
 
-        infoMsg = "parsing second-order HTTP request from '%s'" % conf.secondReq
+        infoMsg = f"parsing second-order HTTP request from '{conf.secondReq}'"
         logger.info(infoMsg)
 
         try:
             target = next(parseRequestFile(conf.secondReq, False))
             kb.secondReq = target
         except StopIteration:
-            errMsg = "specified second-order HTTP request file '%s' " % conf.secondReq
+            errMsg = f"specified second-order HTTP request file '{conf.secondReq}' "
             errMsg += "does not contain a valid HTTP request"
             raise SqlmapDataException(errMsg)
 
@@ -394,11 +403,7 @@ def _doSearch():
             if not conf.forms:
                 infoMsg += ", "
 
-                if len(links) == len(kb.targets):
-                    infoMsg += "all "
-                else:
-                    infoMsg += "%d " % len(kb.targets)
-
+                infoMsg += "all " if len(links) == len(kb.targets) else "%d " % len(kb.targets)
                 infoMsg += "of them are testable targets"
 
             logger.info(infoMsg)
@@ -416,39 +421,46 @@ def _doSearch():
                 conf.googlePage += 1
 
 def _setStdinPipeTargets():
-    if isinstance(conf.stdinPipe, _collections.Iterable):
-        infoMsg = "using 'STDIN' for parsing targets list"
-        logger.info(infoMsg)
+    if not isinstance(conf.stdinPipe, _collections.Iterable):
+        return
+    infoMsg = "using 'STDIN' for parsing targets list"
+    logger.info(infoMsg)
 
-        class _(object):
-            def __init__(self):
-                self.__rest = OrderedSet()
 
-            def __iter__(self):
-                return self
 
-            def __next__(self):
-                return self.next()
+    class _(object):
+        def __init__(self):
+            self.__rest = OrderedSet()
 
-            def next(self):
-                try:
-                    line = next(conf.stdinPipe)
-                except (IOError, OSError):
-                    line = None
+        def __iter__(self):
+            return self
 
-                if line:
-                    match = re.search(r"\b(https?://[^\s'\"]+|[\w.]+\.\w{2,3}[/\w+]*\?[^\s'\"]+)", line, re.I)
-                    if match:
-                        return (match.group(0), conf.method, conf.data, conf.cookie, None)
-                elif self.__rest:
-                    return self.__rest.pop()
+        def __next__(self):
+            return self.next()
 
-                raise StopIteration()
+        def next(self):
+            try:
+                line = next(conf.stdinPipe)
+            except (IOError, OSError):
+                line = None
 
-            def add(self, elem):
-                self.__rest.add(elem)
+            if line:
+                if match := re.search(
+                    r"\b(https?://[^\s'\"]+|[\w.]+\.\w{2,3}[/\w+]*\?[^\s'\"]+)",
+                    line,
+                    re.I,
+                ):
+                    return match[0], conf.method, conf.data, conf.cookie, None
+            elif self.__rest:
+                return self.__rest.pop()
 
-        kb.targets = _()
+            raise StopIteration()
+
+        def add(self, elem):
+            self.__rest.add(elem)
+
+
+    kb.targets = _()
 
 def _setBulkMultipleTargets():
     if not conf.bulkFile:
@@ -456,12 +468,11 @@ def _setBulkMultipleTargets():
 
     conf.bulkFile = safeExpandUser(conf.bulkFile)
 
-    infoMsg = "parsing multiple targets list from '%s'" % conf.bulkFile
+    infoMsg = f"parsing multiple targets list from '{conf.bulkFile}'"
     logger.info(infoMsg)
 
     if not checkFile(conf.bulkFile, False):
-        errMsg = "the specified bulk file "
-        errMsg += "does not exist"
+        errMsg = "the specified bulk file " + "does not exist"
         raise SqlmapFilePathException(errMsg)
 
     found = False
@@ -506,7 +517,7 @@ def _findPageForms():
                 target = targets[i].strip()
 
                 if not re.search(r"(?i)\Ahttp[s]*://", target):
-                    target = "http://%s" % target
+                    target = f"http://{target}"
 
                 page, _, _ = Request.getPage(url=target.strip(), cookie=conf.cookie, crawling=True, raise404=False)
                 if findPageForms(page, target, False, True):
@@ -518,7 +529,7 @@ def _findPageForms():
             except KeyboardInterrupt:
                 break
             except Exception as ex:
-                errMsg = "problem occurred while searching for forms at '%s' ('%s')" % (target, getSafeExString(ex))
+                errMsg = f"problem occurred while searching for forms at '{target}' ('{getSafeExString(ex)}')"
                 logger.error(errMsg)
 
     if not found:
@@ -540,12 +551,14 @@ def _setDBMSAuthentication():
     match = re.search(r"^(.+?):(.*?)$", conf.dbmsCred)
 
     if not match:
-        errMsg = "DBMS authentication credentials value must be in format "
-        errMsg += "username:password"
+        errMsg = (
+            "DBMS authentication credentials value must be in format "
+            + "username:password"
+        )
         raise SqlmapSyntaxException(errMsg)
 
-    conf.dbmsUsername = match.group(1)
-    conf.dbmsPassword = match.group(2)
+    conf.dbmsUsername = match[1]
+    conf.dbmsPassword = match[2]
 
 def _setMetasploit():
     if not conf.osPwn and not conf.osSmb and not conf.osBof:
@@ -560,8 +573,10 @@ def _setMetasploit():
         try:
             __import__("win32file")
         except ImportError:
-            errMsg = "sqlmap requires third-party module 'pywin32' "
-            errMsg += "in order to use Metasploit functionalities on "
+            errMsg = (
+                "sqlmap requires third-party module 'pywin32' "
+                + "in order to use Metasploit functionalities on "
+            )
             errMsg += "Windows. You can download it from "
             errMsg += "'https://github.com/mhammond/pywin32'"
             raise SqlmapMissingDependence(errMsg)
@@ -576,19 +591,46 @@ def _setMetasploit():
         isAdmin = runningAsAdmin()
 
         if not isAdmin:
-            errMsg = "you need to run sqlmap as an administrator "
-            errMsg += "if you want to perform a SMB relay attack because "
+            errMsg = (
+                "you need to run sqlmap as an administrator "
+                + "if you want to perform a SMB relay attack because "
+            )
             errMsg += "it will need to listen on a user-specified SMB "
             errMsg += "TCP port for incoming connection attempts"
             raise SqlmapMissingPrivileges(errMsg)
 
     if conf.msfPath:
         for path in (conf.msfPath, os.path.join(conf.msfPath, "bin")):
-            if any(os.path.exists(normalizePath(os.path.join(path, "%s%s" % (_, ".bat" if IS_WIN else "")))) for _ in ("msfcli", "msfconsole")):
+            if any(
+                os.path.exists(
+                    normalizePath(
+                        os.path.join(path, f'{_}{".bat" if IS_WIN else ""}')
+                    )
+                )
+                for _ in ("msfcli", "msfconsole")
+            ):
                 msfEnvPathExists = True
-                if all(os.path.exists(normalizePath(os.path.join(path, "%s%s" % (_, ".bat" if IS_WIN else "")))) for _ in ("msfvenom",)):
+                if all(
+                    os.path.exists(
+                        normalizePath(
+                            os.path.join(
+                                path, f'{_}{".bat" if IS_WIN else ""}'
+                            )
+                        )
+                    )
+                    for _ in ("msfvenom",)
+                ):
                     kb.oldMsf = False
-                elif all(os.path.exists(normalizePath(os.path.join(path, "%s%s" % (_, ".bat" if IS_WIN else "")))) for _ in ("msfencode", "msfpayload")):
+                elif all(
+                    os.path.exists(
+                        normalizePath(
+                            os.path.join(
+                                path, f'{_}{".bat" if IS_WIN else ""}'
+                            )
+                        )
+                    )
+                    for _ in ("msfencode", "msfpayload")
+                ):
                     kb.oldMsf = True
                 else:
                     msfEnvPathExists = False
@@ -598,24 +640,28 @@ def _setMetasploit():
 
         if msfEnvPathExists:
             debugMsg = "provided Metasploit Framework path "
-            debugMsg += "'%s' is valid" % conf.msfPath
+            debugMsg += f"'{conf.msfPath}' is valid"
             logger.debug(debugMsg)
         else:
             warnMsg = "the provided Metasploit Framework path "
-            warnMsg += "'%s' is not valid. The cause could " % conf.msfPath
+            warnMsg += f"'{conf.msfPath}' is not valid. The cause could "
             warnMsg += "be that the path does not exists or that one "
             warnMsg += "or more of the needed Metasploit executables "
             warnMsg += "within msfcli, msfconsole, msfencode and "
             warnMsg += "msfpayload do not exist"
             logger.warn(warnMsg)
     else:
-        warnMsg = "you did not provide the local path where Metasploit "
-        warnMsg += "Framework is installed"
+        warnMsg = (
+            "you did not provide the local path where Metasploit "
+            + "Framework is installed"
+        )
         logger.warn(warnMsg)
 
     if not msfEnvPathExists:
-        warnMsg = "sqlmap is going to look for Metasploit Framework "
-        warnMsg += "installation inside the environment path(s)"
+        warnMsg = (
+            "sqlmap is going to look for Metasploit Framework "
+            + "installation inside the environment path(s)"
+        )
         logger.warn(warnMsg)
 
         envPaths = os.environ.get("PATH", "").split(";" if IS_WIN else ":")
@@ -623,18 +669,43 @@ def _setMetasploit():
         for envPath in envPaths:
             envPath = envPath.replace(";", "")
 
-            if any(os.path.exists(normalizePath(os.path.join(envPath, "%s%s" % (_, ".bat" if IS_WIN else "")))) for _ in ("msfcli", "msfconsole")):
+            if any(
+                os.path.exists(
+                    normalizePath(
+                        os.path.join(envPath, f'{_}{".bat" if IS_WIN else ""}')
+                    )
+                )
+                for _ in ("msfcli", "msfconsole")
+            ):
                 msfEnvPathExists = True
-                if all(os.path.exists(normalizePath(os.path.join(envPath, "%s%s" % (_, ".bat" if IS_WIN else "")))) for _ in ("msfvenom",)):
+                if all(
+                    os.path.exists(
+                        normalizePath(
+                            os.path.join(
+                                envPath, f'{_}{".bat" if IS_WIN else ""}'
+                            )
+                        )
+                    )
+                    for _ in ("msfvenom",)
+                ):
                     kb.oldMsf = False
-                elif all(os.path.exists(normalizePath(os.path.join(envPath, "%s%s" % (_, ".bat" if IS_WIN else "")))) for _ in ("msfencode", "msfpayload")):
+                elif all(
+                    os.path.exists(
+                        normalizePath(
+                            os.path.join(
+                                envPath, f'{_}{".bat" if IS_WIN else ""}'
+                            )
+                        )
+                    )
+                    for _ in ("msfencode", "msfpayload")
+                ):
                     kb.oldMsf = True
                 else:
                     msfEnvPathExists = False
 
                 if msfEnvPathExists:
                     infoMsg = "Metasploit Framework has been found "
-                    infoMsg += "installed in the '%s' path" % envPath
+                    infoMsg += f"installed in the '{envPath}' path"
                     logger.info(infoMsg)
 
                     conf.msfPath = envPath
@@ -642,8 +713,10 @@ def _setMetasploit():
                     break
 
     if not msfEnvPathExists:
-        errMsg = "unable to locate Metasploit Framework installation. "
-        errMsg += "You can get it at 'https://www.metasploit.com/download/'"
+        errMsg = (
+            "unable to locate Metasploit Framework installation. "
+            + "You can get it at 'https://www.metasploit.com/download/'"
+        )
         raise SqlmapFilePathException(errMsg)
 
 def _setWriteFile():
@@ -654,12 +727,12 @@ def _setWriteFile():
     logger.debug(debugMsg)
 
     if not os.path.exists(conf.fileWrite):
-        errMsg = "the provided local file '%s' does not exist" % conf.fileWrite
+        errMsg = f"the provided local file '{conf.fileWrite}' does not exist"
         raise SqlmapFilePathException(errMsg)
 
     if not conf.fileDest:
         errMsg = "you did not provide the back-end DBMS absolute path "
-        errMsg += "where you want to write the local file '%s'" % conf.fileWrite
+        errMsg += f"where you want to write the local file '{conf.fileWrite}'"
         raise SqlmapMissingMandatoryOptionException(errMsg)
 
     conf.fileWriteType = getFileType(conf.fileWrite)
@@ -673,40 +746,43 @@ def _setOS():
         return
 
     if conf.os.lower() not in SUPPORTED_OS:
-        errMsg = "you provided an unsupported back-end DBMS operating "
-        errMsg += "system. The supported DBMS operating systems for OS "
-        errMsg += "and file system access are %s. " % ', '.join([o.capitalize() for o in SUPPORTED_OS])
+        errMsg = (
+            "you provided an unsupported back-end DBMS operating "
+            + "system. The supported DBMS operating systems for OS "
+        )
+        errMsg += f"and file system access are {', '.join([o.capitalize() for o in SUPPORTED_OS])}. "
         errMsg += "If you do not know the back-end DBMS underlying OS, "
         errMsg += "do not provide it and sqlmap will fingerprint it for "
         errMsg += "you."
         raise SqlmapUnsupportedDBMSException(errMsg)
 
     debugMsg = "forcing back-end DBMS operating system to user defined "
-    debugMsg += "value '%s'" % conf.os
+    debugMsg += f"value '{conf.os}'"
     logger.debug(debugMsg)
 
     Backend.setOs(conf.os)
 
 def _setTechnique():
+    if not conf.technique or not isinstance(conf.technique, six.string_types):
+        return
+    _ = []
+
     validTechniques = sorted(getPublicTypeMembers(PAYLOAD.TECHNIQUE), key=lambda x: x[1])
     validLetters = [_[0][0].upper() for _ in validTechniques]
 
-    if conf.technique and isinstance(conf.technique, six.string_types):
-        _ = []
+    for letter in conf.technique.upper():
+        if letter not in validLetters:
+            errMsg = "value for --technique must be a string composed "
+            errMsg += f'by the letters {", ".join(validLetters)}. Refer to the '
+            errMsg += "user's manual for details"
+            raise SqlmapSyntaxException(errMsg)
 
-        for letter in conf.technique.upper():
-            if letter not in validLetters:
-                errMsg = "value for --technique must be a string composed "
-                errMsg += "by the letters %s. Refer to the " % ", ".join(validLetters)
-                errMsg += "user's manual for details"
-                raise SqlmapSyntaxException(errMsg)
+        for validTech, validInt in validTechniques:
+            if letter == validTech[0]:
+                _.append(validInt)
+                break
 
-            for validTech, validInt in validTechniques:
-                if letter == validTech[0]:
-                    _.append(validInt)
-                    break
-
-        conf.technique = _
+    conf.technique = _
 
 def _setDBMS():
     """
@@ -720,15 +796,20 @@ def _setDBMS():
     logger.debug(debugMsg)
 
     conf.dbms = conf.dbms.lower()
-    regex = re.search(r"%s ([\d\.]+)" % ("(%s)" % "|".join(SUPPORTED_DBMS)), conf.dbms, re.I)
-
-    if regex:
-        conf.dbms = regex.group(1)
-        Backend.setVersion(regex.group(2))
+    if regex := re.search(
+        r"%s ([\d\.]+)" % f'({"|".join(SUPPORTED_DBMS)})', conf.dbms, re.I
+    ):
+        conf.dbms = regex[1]
+        Backend.setVersion(regex[2])
 
     if conf.dbms not in SUPPORTED_DBMS:
         errMsg = "you provided an unsupported back-end database management "
-        errMsg += "system. Supported DBMSes are as follows: %s. " % ', '.join(sorted((_ for _ in (list(DBMS_DICT) + getPublicTypeMembers(FORK, True))), key=str.lower))
+        errMsg += "system. Supported DBMSes are as follows: %s. " % ', '.join(
+            sorted(
+                iter(list(DBMS_DICT) + getPublicTypeMembers(FORK, True)),
+                key=str.lower,
+            )
+        )
         errMsg += "If you do not know the back-end DBMS, do not provide "
         errMsg += "it and sqlmap will fingerprint it for you."
         raise SqlmapUnsupportedDBMSException(errMsg)
@@ -750,9 +831,8 @@ def _listTamperingFunctions():
 
         for script in sorted(glob.glob(os.path.join(paths.SQLMAP_TAMPER_PATH, "*.py"))):
             content = openFile(script, "rb").read()
-            match = re.search(r'(?s)__priority__.+"""(.+)"""', content)
-            if match:
-                comment = match.group(1).strip()
+            if match := re.search(r'(?s)__priority__.+"""(.+)"""', content):
+                comment = match[1].strip()
                 dataToStdout("* %s - %s\n" % (setColor(os.path.basename(script), "yellow"), re.sub(r" *\n *", " ", comment.split("\n\n")[0].strip())))
 
 def _setTamperingFunctions():
@@ -760,264 +840,277 @@ def _setTamperingFunctions():
     Loads tampering functions from given script(s)
     """
 
-    if conf.tamper:
-        last_priority = PRIORITY.HIGHEST
-        check_priority = True
-        resolve_priorities = False
-        priorities = []
+    if not conf.tamper:
+        return
+    last_priority = PRIORITY.HIGHEST
+    check_priority = True
+    resolve_priorities = False
+    priorities = []
 
-        for script in re.split(PARAMETER_SPLITTING_REGEX, conf.tamper):
-            found = False
+    for script in re.split(PARAMETER_SPLITTING_REGEX, conf.tamper):
+        found = False
 
-            path = safeFilepathEncode(paths.SQLMAP_TAMPER_PATH)
-            script = safeFilepathEncode(script.strip())
+        path = safeFilepathEncode(paths.SQLMAP_TAMPER_PATH)
+        script = safeFilepathEncode(script.strip())
 
-            try:
-                if not script:
-                    continue
+        try:
+            if not script:
+                continue
 
-                elif os.path.exists(os.path.join(path, script if script.endswith(".py") else "%s.py" % script)):
-                    script = os.path.join(path, script if script.endswith(".py") else "%s.py" % script)
+            elif os.path.exists(
+                os.path.join(
+                    path, script if script.endswith(".py") else f"{script}.py"
+                )
+            ):
+                script = os.path.join(
+                    path, script if script.endswith(".py") else f"{script}.py"
+                )
 
-                elif not os.path.exists(script):
-                    errMsg = "tamper script '%s' does not exist" % script
-                    raise SqlmapFilePathException(errMsg)
+            elif not os.path.exists(script):
+                errMsg = f"tamper script '{script}' does not exist"
+                raise SqlmapFilePathException(errMsg)
 
-                elif not script.endswith(".py"):
-                    errMsg = "tamper script '%s' should have an extension '.py'" % script
-                    raise SqlmapSyntaxException(errMsg)
-            except UnicodeDecodeError:
-                errMsg = "invalid character provided in option '--tamper'"
+            elif not script.endswith(".py"):
+                errMsg = f"tamper script '{script}' should have an extension '.py'"
                 raise SqlmapSyntaxException(errMsg)
+        except UnicodeDecodeError:
+            errMsg = "invalid character provided in option '--tamper'"
+            raise SqlmapSyntaxException(errMsg)
 
-            dirname, filename = os.path.split(script)
-            dirname = os.path.abspath(dirname)
+        dirname, filename = os.path.split(script)
+        dirname = os.path.abspath(dirname)
 
-            infoMsg = "loading tamper module '%s'" % filename[:-3]
-            logger.info(infoMsg)
+        infoMsg = f"loading tamper module '{filename[:-3]}'"
+        logger.info(infoMsg)
 
-            if not os.path.exists(os.path.join(dirname, "__init__.py")):
-                errMsg = "make sure that there is an empty file '__init__.py' "
-                errMsg += "inside of tamper scripts directory '%s'" % dirname
-                raise SqlmapGenericException(errMsg)
+        if not os.path.exists(os.path.join(dirname, "__init__.py")):
+            errMsg = "make sure that there is an empty file '__init__.py' "
+            errMsg += f"inside of tamper scripts directory '{dirname}'"
+            raise SqlmapGenericException(errMsg)
 
-            if dirname not in sys.path:
-                sys.path.insert(0, dirname)
+        if dirname not in sys.path:
+            sys.path.insert(0, dirname)
 
-            try:
-                module = __import__(safeFilepathEncode(filename[:-3]))
-            except Exception as ex:
-                raise SqlmapSyntaxException("cannot import tamper module '%s' (%s)" % (getUnicode(filename[:-3]), getSafeExString(ex)))
+        try:
+            module = __import__(safeFilepathEncode(filename[:-3]))
+        except Exception as ex:
+            raise SqlmapSyntaxException(
+                f"cannot import tamper module '{getUnicode(filename[:-3])}' ({getSafeExString(ex)})"
+            )
 
-            priority = PRIORITY.NORMAL if not hasattr(module, "__priority__") else module.__priority__
+        priority = PRIORITY.NORMAL if not hasattr(module, "__priority__") else module.__priority__
 
-            for name, function in inspect.getmembers(module, inspect.isfunction):
-                if name == "tamper" and inspect.getargspec(function).args and inspect.getargspec(function).keywords == "kwargs":
-                    found = True
-                    kb.tamperFunctions.append(function)
-                    function.__name__ = module.__name__
-
-                    if check_priority and priority > last_priority:
-                        message = "it appears that you might have mixed "
-                        message += "the order of tamper scripts. "
-                        message += "Do you want to auto resolve this? [Y/n/q] "
-                        choice = readInput(message, default='Y').upper()
-
-                        if choice == 'N':
-                            resolve_priorities = False
-                        elif choice == 'Q':
-                            raise SqlmapUserQuitException
-                        else:
-                            resolve_priorities = True
-
-                        check_priority = False
-
-                    priorities.append((priority, function))
-                    last_priority = priority
-
-                    break
-                elif name == "dependencies":
-                    try:
-                        function()
-                    except Exception as ex:
-                        errMsg = "error occurred while checking dependencies "
-                        errMsg += "for tamper module '%s' ('%s')" % (getUnicode(filename[:-3]), getSafeExString(ex))
-                        raise SqlmapGenericException(errMsg)
-
-            if not found:
-                errMsg = "missing function 'tamper(payload, **kwargs)' "
-                errMsg += "in tamper script '%s'" % script
-                raise SqlmapGenericException(errMsg)
-
-        if kb.tamperFunctions and len(kb.tamperFunctions) > 3:
-            warnMsg = "using too many tamper scripts is usually not "
-            warnMsg += "a good idea"
-            logger.warning(warnMsg)
-
-        if resolve_priorities and priorities:
-            priorities.sort(key=functools.cmp_to_key(lambda a, b: cmp(a[0], b[0])), reverse=True)
-            kb.tamperFunctions = []
-
-            for _, function in priorities:
+        for name, function in inspect.getmembers(module, inspect.isfunction):
+            if name == "tamper" and inspect.getargspec(function).args and inspect.getargspec(function).keywords == "kwargs":
+                found = True
                 kb.tamperFunctions.append(function)
+                function.__name__ = module.__name__
+
+                if check_priority and priority > last_priority:
+                    message = (
+                        "it appears that you might have mixed "
+                        + "the order of tamper scripts. "
+                    )
+                    message += "Do you want to auto resolve this? [Y/n/q] "
+                    choice = readInput(message, default='Y').upper()
+
+                    if choice == 'N':
+                        resolve_priorities = False
+                    elif choice == 'Q':
+                        raise SqlmapUserQuitException
+                    else:
+                        resolve_priorities = True
+
+                    check_priority = False
+
+                priorities.append((priority, function))
+                last_priority = priority
+
+                break
+            elif name == "dependencies":
+                try:
+                    function()
+                except Exception as ex:
+                    errMsg = "error occurred while checking dependencies "
+                    errMsg += f"for tamper module '{getUnicode(filename[:-3])}' ('{getSafeExString(ex)}')"
+                    raise SqlmapGenericException(errMsg)
+
+        if not found:
+            errMsg = "missing function 'tamper(payload, **kwargs)' "
+            errMsg += f"in tamper script '{script}'"
+            raise SqlmapGenericException(errMsg)
+
+    if kb.tamperFunctions and len(kb.tamperFunctions) > 3:
+        warnMsg = "using too many tamper scripts is usually not " + "a good idea"
+        logger.warning(warnMsg)
+
+    if resolve_priorities and priorities:
+        priorities.sort(key=functools.cmp_to_key(lambda a, b: cmp(a[0], b[0])), reverse=True)
+        kb.tamperFunctions = [function for _, function in priorities]
 
 def _setPreprocessFunctions():
     """
     Loads preprocess function(s) from given script(s)
     """
 
-    if conf.preprocess:
-        for script in re.split(PARAMETER_SPLITTING_REGEX, conf.preprocess):
-            found = False
-            function = None
+    if not conf.preprocess:
+        return
+    for script in re.split(PARAMETER_SPLITTING_REGEX, conf.preprocess):
+        found = False
+        function = None
 
-            script = safeFilepathEncode(script.strip())
+        script = safeFilepathEncode(script.strip())
 
-            try:
-                if not script:
-                    continue
+        try:
+            if not script:
+                continue
 
-                if not os.path.exists(script):
-                    errMsg = "preprocess script '%s' does not exist" % script
-                    raise SqlmapFilePathException(errMsg)
+            if not os.path.exists(script):
+                errMsg = f"preprocess script '{script}' does not exist"
+                raise SqlmapFilePathException(errMsg)
 
-                elif not script.endswith(".py"):
-                    errMsg = "preprocess script '%s' should have an extension '.py'" % script
-                    raise SqlmapSyntaxException(errMsg)
-            except UnicodeDecodeError:
-                errMsg = "invalid character provided in option '--preprocess'"
+            elif not script.endswith(".py"):
+                errMsg = f"preprocess script '{script}' should have an extension '.py'"
                 raise SqlmapSyntaxException(errMsg)
+        except UnicodeDecodeError:
+            errMsg = "invalid character provided in option '--preprocess'"
+            raise SqlmapSyntaxException(errMsg)
 
-            dirname, filename = os.path.split(script)
-            dirname = os.path.abspath(dirname)
+        dirname, filename = os.path.split(script)
+        dirname = os.path.abspath(dirname)
 
-            infoMsg = "loading preprocess module '%s'" % filename[:-3]
-            logger.info(infoMsg)
+        infoMsg = f"loading preprocess module '{filename[:-3]}'"
+        logger.info(infoMsg)
 
-            if not os.path.exists(os.path.join(dirname, "__init__.py")):
-                errMsg = "make sure that there is an empty file '__init__.py' "
-                errMsg += "inside of preprocess scripts directory '%s'" % dirname
-                raise SqlmapGenericException(errMsg)
+        if not os.path.exists(os.path.join(dirname, "__init__.py")):
+            errMsg = "make sure that there is an empty file '__init__.py' "
+            errMsg += f"inside of preprocess scripts directory '{dirname}'"
+            raise SqlmapGenericException(errMsg)
 
-            if dirname not in sys.path:
-                sys.path.insert(0, dirname)
+        if dirname not in sys.path:
+            sys.path.insert(0, dirname)
 
+        try:
+            module = __import__(safeFilepathEncode(filename[:-3]))
+        except Exception as ex:
+            raise SqlmapSyntaxException(
+                f"cannot import preprocess module '{getUnicode(filename[:-3])}' ({getSafeExString(ex)})"
+            )
+
+        for name, function in inspect.getmembers(module, inspect.isfunction):
             try:
-                module = __import__(safeFilepathEncode(filename[:-3]))
-            except Exception as ex:
-                raise SqlmapSyntaxException("cannot import preprocess module '%s' (%s)" % (getUnicode(filename[:-3]), getSafeExString(ex)))
+                if name == "preprocess" and inspect.getargspec(function).args and all(_ in inspect.getargspec(function).args for _ in ("req",)):
+                    found = True
 
-            for name, function in inspect.getmembers(module, inspect.isfunction):
-                try:
-                    if name == "preprocess" and inspect.getargspec(function).args and all(_ in inspect.getargspec(function).args for _ in ("req",)):
-                        found = True
+                    kb.preprocessFunctions.append(function)
+                    function.__name__ = module.__name__
 
-                        kb.preprocessFunctions.append(function)
-                        function.__name__ = module.__name__
+                    break
+            except ValueError:  # Note: https://github.com/sqlmapproject/sqlmap/issues/4357
+                pass
 
-                        break
-                except ValueError:  # Note: https://github.com/sqlmapproject/sqlmap/issues/4357
-                    pass
+        if not found:
+            errMsg = "missing function 'preprocess(req)' "
+            errMsg += f"in preprocess script '{script}'"
+            raise SqlmapGenericException(errMsg)
+        else:
+            try:
+                function(_urllib.request.Request("http://localhost"))
+            except:
+                tbMsg = traceback.format_exc()
 
-            if not found:
-                errMsg = "missing function 'preprocess(req)' "
-                errMsg += "in preprocess script '%s'" % script
+                if conf.debug:
+                    dataToStdout(tbMsg)
+
+                handle, filename = tempfile.mkstemp(prefix=MKSTEMP_PREFIX.PREPROCESS, suffix=".py")
+                os.close(handle)
+
+                openFile(filename, "w+b").write("#!/usr/bin/env\n\ndef preprocess(req):\n    pass\n")
+                openFile(os.path.join(os.path.dirname(filename), "__init__.py"), "w+b").write("pass")
+
+                errMsg = "function 'preprocess(req)' "
+                errMsg += f"in preprocess script '{script}' "
+                errMsg += "appears to be invalid "
+                errMsg += f"(Note: find template script at '{filename}')"
                 raise SqlmapGenericException(errMsg)
-            else:
-                try:
-                    function(_urllib.request.Request("http://localhost"))
-                except:
-                    tbMsg = traceback.format_exc()
-
-                    if conf.debug:
-                        dataToStdout(tbMsg)
-
-                    handle, filename = tempfile.mkstemp(prefix=MKSTEMP_PREFIX.PREPROCESS, suffix=".py")
-                    os.close(handle)
-
-                    openFile(filename, "w+b").write("#!/usr/bin/env\n\ndef preprocess(req):\n    pass\n")
-                    openFile(os.path.join(os.path.dirname(filename), "__init__.py"), "w+b").write("pass")
-
-                    errMsg = "function 'preprocess(req)' "
-                    errMsg += "in preprocess script '%s' " % script
-                    errMsg += "appears to be invalid "
-                    errMsg += "(Note: find template script at '%s')" % filename
-                    raise SqlmapGenericException(errMsg)
 
 def _setPostprocessFunctions():
     """
     Loads postprocess function(s) from given script(s)
     """
 
-    if conf.postprocess:
-        for script in re.split(PARAMETER_SPLITTING_REGEX, conf.postprocess):
-            found = False
-            function = None
+    if not conf.postprocess:
+        return
+    for script in re.split(PARAMETER_SPLITTING_REGEX, conf.postprocess):
+        found = False
+        function = None
 
-            script = safeFilepathEncode(script.strip())
+        script = safeFilepathEncode(script.strip())
 
-            try:
-                if not script:
-                    continue
+        try:
+            if not script:
+                continue
 
-                if not os.path.exists(script):
-                    errMsg = "postprocess script '%s' does not exist" % script
-                    raise SqlmapFilePathException(errMsg)
+            if not os.path.exists(script):
+                errMsg = f"postprocess script '{script}' does not exist"
+                raise SqlmapFilePathException(errMsg)
 
-                elif not script.endswith(".py"):
-                    errMsg = "postprocess script '%s' should have an extension '.py'" % script
-                    raise SqlmapSyntaxException(errMsg)
-            except UnicodeDecodeError:
-                errMsg = "invalid character provided in option '--postprocess'"
+            elif not script.endswith(".py"):
+                errMsg = f"postprocess script '{script}' should have an extension '.py'"
                 raise SqlmapSyntaxException(errMsg)
+        except UnicodeDecodeError:
+            errMsg = "invalid character provided in option '--postprocess'"
+            raise SqlmapSyntaxException(errMsg)
 
-            dirname, filename = os.path.split(script)
-            dirname = os.path.abspath(dirname)
+        dirname, filename = os.path.split(script)
+        dirname = os.path.abspath(dirname)
 
-            infoMsg = "loading postprocess module '%s'" % filename[:-3]
-            logger.info(infoMsg)
+        infoMsg = f"loading postprocess module '{filename[:-3]}'"
+        logger.info(infoMsg)
 
-            if not os.path.exists(os.path.join(dirname, "__init__.py")):
-                errMsg = "make sure that there is an empty file '__init__.py' "
-                errMsg += "inside of postprocess scripts directory '%s'" % dirname
-                raise SqlmapGenericException(errMsg)
+        if not os.path.exists(os.path.join(dirname, "__init__.py")):
+            errMsg = "make sure that there is an empty file '__init__.py' "
+            errMsg += f"inside of postprocess scripts directory '{dirname}'"
+            raise SqlmapGenericException(errMsg)
 
-            if dirname not in sys.path:
-                sys.path.insert(0, dirname)
+        if dirname not in sys.path:
+            sys.path.insert(0, dirname)
 
+        try:
+            module = __import__(safeFilepathEncode(filename[:-3]))
+        except Exception as ex:
+            raise SqlmapSyntaxException(
+                f"cannot import postprocess module '{getUnicode(filename[:-3])}' ({getSafeExString(ex)})"
+            )
+
+        for name, function in inspect.getmembers(module, inspect.isfunction):
+            if name == "postprocess" and inspect.getargspec(function).args and all(_ in inspect.getargspec(function).args for _ in ("page", "headers", "code")):
+                found = True
+
+                kb.postprocessFunctions.append(function)
+                function.__name__ = module.__name__
+
+                break
+
+        if not found:
+            errMsg = "missing function 'postprocess(page, headers=None, code=None)' "
+            errMsg += f"in postprocess script '{script}'"
+            raise SqlmapGenericException(errMsg)
+        else:
             try:
-                module = __import__(safeFilepathEncode(filename[:-3]))
-            except Exception as ex:
-                raise SqlmapSyntaxException("cannot import postprocess module '%s' (%s)" % (getUnicode(filename[:-3]), getSafeExString(ex)))
+                _, _, _ = function("", {}, None)
+            except:
+                handle, filename = tempfile.mkstemp(prefix=MKSTEMP_PREFIX.PREPROCESS, suffix=".py")
+                os.close(handle)
 
-            for name, function in inspect.getmembers(module, inspect.isfunction):
-                if name == "postprocess" and inspect.getargspec(function).args and all(_ in inspect.getargspec(function).args for _ in ("page", "headers", "code")):
-                    found = True
+                openFile(filename, "w+b").write("#!/usr/bin/env\n\ndef postprocess(page, headers=None, code=None):\n    return page, headers, code\n")
+                openFile(os.path.join(os.path.dirname(filename), "__init__.py"), "w+b").write("pass")
 
-                    kb.postprocessFunctions.append(function)
-                    function.__name__ = module.__name__
-
-                    break
-
-            if not found:
-                errMsg = "missing function 'postprocess(page, headers=None, code=None)' "
-                errMsg += "in postprocess script '%s'" % script
+                errMsg = "function 'postprocess(page, headers=None, code=None)' "
+                errMsg += f"in postprocess script '{script}' "
+                errMsg += "should return a tuple '(page, headers, code)' "
+                errMsg += f"(Note: find template script at '{filename}')"
                 raise SqlmapGenericException(errMsg)
-            else:
-                try:
-                    _, _, _ = function("", {}, None)
-                except:
-                    handle, filename = tempfile.mkstemp(prefix=MKSTEMP_PREFIX.PREPROCESS, suffix=".py")
-                    os.close(handle)
-
-                    openFile(filename, "w+b").write("#!/usr/bin/env\n\ndef postprocess(page, headers=None, code=None):\n    return page, headers, code\n")
-                    openFile(os.path.join(os.path.dirname(filename), "__init__.py"), "w+b").write("pass")
-
-                    errMsg = "function 'postprocess(page, headers=None, code=None)' "
-                    errMsg += "in postprocess script '%s' " % script
-                    errMsg += "should return a tuple '(page, headers, code)' "
-                    errMsg += "(Note: find template script at '%s')" % filename
-                    raise SqlmapGenericException(errMsg)
 
 def _setThreads():
     if not isinstance(conf.threads, int) or conf.threads <= 0:
@@ -1032,9 +1125,8 @@ def _setDNSCache():
         if args in kb.cache.addrinfo:
             return kb.cache.addrinfo[args]
 
-        else:
-            kb.cache.addrinfo[args] = socket._getaddrinfo(*args, **kwargs)
-            return kb.cache.addrinfo[args]
+        kb.cache.addrinfo[args] = socket._getaddrinfo(*args, **kwargs)
+        return kb.cache.addrinfo[args]
 
     if not hasattr(socket, "_getaddrinfo"):
         socket._getaddrinfo = socket.getaddrinfo
