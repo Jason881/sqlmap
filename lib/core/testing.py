@@ -127,11 +127,21 @@ def vulnTest():
     open(log, "w+").write('<port>%d</port><request base64="true"><![CDATA[%s]]></request>' % (port, encodeBase64(content, binary=False)))
 
     base = "http://%s:%d/" % (address, port)
-    url = "%s?id=1" % base
-    direct = "sqlite3://%s" % database
+    url = f"{base}?id=1"
+    direct = f"sqlite3://{database}"
     tmpdir = tempfile.mkdtemp()
 
-    content = open(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sqlmap.conf"))).read().replace("url =", "url = %s" % url)
+    content = (
+        open(
+            os.path.abspath(
+                os.path.join(
+                    os.path.dirname(__file__), "..", "..", "sqlmap.conf"
+                )
+            )
+        )
+        .read()
+        .replace("url =", f"url = {url}")
+    )
     open(config, "w+").write(content)
 
     open(multiple, "w+").write("%s?%s=%d\n%s?%s=%d\n%s&%s=1" % (base, randomStr(), randomInt(), base, randomStr(), randomInt(), url, randomStr()))
@@ -152,7 +162,7 @@ def vulnTest():
 
         if "<piped>" in cmd:
             cmd = re.sub(r"<piped>\s*", "", cmd)
-            cmd = "echo %s | %s" % (url, cmd)
+            cmd = f"echo {url} | {cmd}"
 
         output = shellExec(cmd)
 
@@ -196,7 +206,17 @@ def fuzzTest():
 
     url = "http://%s:%d/?id=1" % (address, port)
 
-    content = open(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sqlmap.conf"))).read().replace("url =", "url = %s" % url)
+    content = (
+        open(
+            os.path.abspath(
+                os.path.join(
+                    os.path.dirname(__file__), "..", "..", "sqlmap.conf"
+                )
+            )
+        )
+        .read()
+        .replace("url =", f"url = {url}")
+    )
     open(config, "w+").write(content)
 
     while True:
@@ -221,7 +241,7 @@ def fuzzTest():
 
         open(config, "w+").write("\n".join(lines))
 
-        cmd = "%s %s -c %s --non-interactive --answers='Github=n' --flush-session --technique=%s --banner" % (sys.executable, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sqlmap.py")), config, random.sample("BEUQ", 1)[0])
+        cmd = f"""{sys.executable} {os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "sqlmap.py"))} -c {config} --non-interactive --answers='Github=n' --flush-session --technique={random.sample("BEUQ", 1)[0]} --banner"""
         output = shellExec(cmd)
 
         if "Traceback" in output:
@@ -248,7 +268,7 @@ def smokeTest():
         try:
             re.compile(regex)
         except re.error:
-            errMsg = "smoke test failed at compiling '%s'" % regex
+            errMsg = f"smoke test failed at compiling '{regex}'"
             logger.error(errMsg)
             return False
 
@@ -305,7 +325,7 @@ def smokeTest():
                         try:
                             re.compile(candidate)
                         except:
-                            errMsg = "smoke test failed at compiling '%s'" % candidate
+                            errMsg = f"smoke test failed at compiling '{candidate}'"
                             logger.error(errMsg)
                             raise
                 else:
